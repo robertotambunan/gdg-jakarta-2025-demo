@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            border: 1px solid #e8eaed;
+        }
+
+        h1 {
+            color: #202124;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+            font-weight: 400;
+        }
+
+        .search-form {
+            margin-bottom: 30px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 1px solid #dadce0;
+            border-radius: 24px;
+            outline: none;
+            transition: all 0.2s;
+            background: #fff;
+        }
+
+        .search-input:hover {
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-input:focus {
+            border-color: #4285f4;
+            box-shadow: 0 2px 8px rgba(66, 133, 244, 0.2);
+        }
+
+        .results {
+            margin-top: 30px;
+        }
+
+        .result-item {
+            background: #f8f9fa;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            border-left: 3px solid #4285f4;
+            transition: all 0.2s;
+            border: 1px solid #e8eaed;
+            border-left: 3px solid #4285f4;
+        }
+
+        .result-item:hover {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            background: #f1f3f4;
+        }
+
+        .result-nama {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .result-kategori {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .result-harga {
+            color: #34a853;
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+
+        .no-results {
+            text-align: center;
+            color: #999;
+            padding: 40px;
+            font-size: 1.1em;
+        }
+
+        .query-info {
+            margin-bottom: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            text-align: center;
+            color: #4285f4;
+            padding: 20px;
+            font-size: 0.9em;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{.Title}}</h1>
+        
+        <div class="search-form">
+            <input 
+                type="text" 
+                id="searchInput"
+                class="search-input" 
+                placeholder="Cari buah... (contoh: ap, ape, apel)"
+                autofocus
+            >
+        </div>
+
+        <div id="queryInfo" class="query-info" style="display: none;">
+            Menampilkan hasil untuk: <strong id="queryText"></strong>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">
+            Mencari
+        </div>
+
+        <div id="results" class="results">
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            let searchTimeout;
+            const searchInput = document.getElementById('searchInput');
+            const resultsDiv = document.getElementById('results');
+            const queryInfo = document.getElementById('queryInfo');
+            const queryText = document.getElementById('queryText');
+            const loadingDiv = document.getElementById('loading');
+
+            function formatPrice(price) {
+                return new Intl.NumberFormat('id-ID').format(price);
+            }
+
+            function renderResults(data) {
+                resultsDiv.innerHTML = '';
+                
+                if (data.query) {
+                    queryInfo.style.display = 'block';
+                    queryText.textContent = data.query;
+                } else {
+                    queryInfo.style.display = 'none';
+                }
+
+                if (data.results && data.results.length > 0) {
+                    data.results.forEach(fruit => {
+                        const item = document.createElement('div');
+                        item.className = 'result-item';
+                        item.innerHTML = `
+                            <div class="result-nama">${fruit.Nama}</div>
+                            <div class="result-kategori">${fruit.Kategori}</div>
+                            <div class="result-harga">Rp ${formatPrice(fruit.Harga)}</div>
+                        `;
+                        resultsDiv.appendChild(item);
+                    });
+                } else if (data.query) {
+                    const noResults = document.createElement('div');
+                    noResults.className = 'no-results';
+                    noResults.textContent = `Tidak ada hasil ditemukan untuk "${data.query}"`;
+                    resultsDiv.appendChild(noResults);
+                }
+            }
+
+            function performSearch(query) {
+                if (!query || query.trim() === '') {
+                    queryInfo.style.display = 'none';
+                    resultsDiv.innerHTML = '';
+                    loadingDiv.style.display = 'none';
+                    return;
+                }
+
+                loadingDiv.style.display = 'block';
+                
+                fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        loadingDiv.style.display = 'none';
+                        renderResults(data);
+                    })
+                    .catch(error => {
+                        loadingDiv.style.display = 'none';
+                        resultsDiv.innerHTML = `
+                            <div class="no-results">
+                                Error: ${error.message}
+                            </div>
+                        `;
+                        console.error('Search error:', error);
+                    });
+            }
+
+            // Set up input event listener
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const query = e.target.value;
+                    
+                    // Clear previous timeout
+                    clearTimeout(searchTimeout);
+                    
+                    // Hide loading immediately
+                    loadingDiv.style.display = 'none';
+                    
+                    // Set new timeout for 500ms throttle
+                    searchTimeout = setTimeout(() => {
+                        performSearch(query);
+                    }, 500);
+                });
+
+                // Prevent form submission on Enter
+                searchInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        clearTimeout(searchTimeout);
+                        performSearch(e.target.value);
+                    }
+                });
+            } else {
+                console.error('Search input element not found!');
+            }
+
+            // Initial load - show empty state
+            renderResults({ results: [], query: '' });
+        })();
+    </script>
+</body>
+</html>
+
+

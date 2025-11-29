@@ -1,0 +1,217 @@
+### Elasticsearch Autocomplete Demo - HTTP Requests
+### Use with VS Code REST Client extension or similar tools
+### Base URL
+@baseUrl = http://localhost:9200
+
+### ============================================
+### 1. Health Check
+### ============================================
+GET {{baseUrl}}/_cluster/health
+Content-Type: application/json
+
+### ============================================
+### 2. Create Index with Mapping
+### ============================================
+PUT {{baseUrl}}/supermarket_buah
+Content-Type: application/json
+
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "autocomplete_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "autocomplete_filter"
+          ]
+        },
+        "autocomplete_search_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase"
+          ]
+        }
+      },
+      "filter": {
+        "autocomplete_filter": {
+          "type": "edge_ngram",
+          "min_gram": 2,
+          "max_gram": 10
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "nama": {
+        "type": "text",
+        "analyzer": "autocomplete_analyzer",
+        "search_analyzer": "autocomplete_search_analyzer",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "kategori": {
+        "type": "keyword"
+      },
+      "harga": {
+        "type": "float"
+      }
+    }
+  }
+}
+
+### ============================================
+### 3. Test Analyzers
+### ============================================
+
+### Test autocomplete_analyzer (Index Time)
+### This analyzer creates n-grams for indexing
+POST {{baseUrl}}/supermarket_buah/_analyze
+Content-Type: application/json
+
+{
+  "analyzer": "autocomplete_analyzer",
+  "text": "Apel Merah"
+}
+
+### Test autocomplete_search_analyzer (Query Time)
+### This analyzer does NOT create n-grams, just lowercases
+POST {{baseUrl}}/supermarket_buah/_analyze
+Content-Type: application/json
+
+{
+  "analyzer": "autocomplete_search_analyzer",
+  "text": "Apel Merah"
+}
+
+### ============================================
+### 4. Bulk Insert Data
+### ============================================
+POST {{baseUrl}}/supermarket_buah/_bulk
+Content-Type: application/x-ndjson
+
+{ "index": {} }
+{ "nama": "Apel Merah", "kategori": "Buah Lokal", "harga": 25000 }
+{ "index": {} }
+{ "nama": "Apukat Mentega", "kategori": "Buah Import", "harga": 35000 }
+{ "index": {} }
+{ "nama": "Anggur Merah", "kategori": "Buah Import", "harga": 45000 }
+{ "index": {} }
+{ "nama": "Alpukat Hijau", "kategori": "Buah Lokal", "harga": 20000 }
+{ "index": {} }
+{ "nama": "Belimbing Manis", "kategori": "Buah Lokal", "harga": 15000 }
+{ "index": {} }
+{ "nama": "Buah Naga Merah", "kategori": "Buah Import", "harga": 30000 }
+{ "index": {} }
+{ "nama": "Durian Montong", "kategori": "Buah Lokal", "harga": 80000 }
+{ "index": {} }
+{ "nama": "Jeruk Medan", "kategori": "Buah Lokal", "harga": 18000 }
+{ "index": {} }
+{ "nama": "Mangga Harum Manis", "kategori": "Buah Lokal", "harga": 22000 }
+{ "index": {} }
+{ "nama": "Pisang Ambon", "kategori": "Buah Lokal", "harga": 12000 }
+{ "index": {} }
+{ "nama": "Salak Pondoh", "kategori": "Buah Lokal", "harga": 18000 }
+{ "index": {} }
+{ "nama": "Rambutan Binjai", "kategori": "Buah Lokal", "harga": 25000 }
+{ "index": {} }
+{ "nama": "Jambu Air", "kategori": "Buah Lokal", "harga": 20000 }
+{ "index": {} }
+{ "nama": "Nanas Madu", "kategori": "Buah Lokal", "harga": 15000 }
+{ "index": {} }
+{ "nama": "Semangka Merah", "kategori": "Buah Lokal", "harga": 12000 }
+{ "index": {} }
+{ "nama": "Melon Hijau", "kategori": "Buah Lokal", "harga": 18000 }
+{ "index": {} }
+{ "nama": "Pepaya Calina", "kategori": "Buah Lokal", "harga": 15000 }
+{ "index": {} }
+{ "nama": "Sirsak", "kategori": "Buah Lokal", "harga": 22000 }
+{ "index": {} }
+{ "nama": "Nangka", "kategori": "Buah Lokal", "harga": 25000 }
+{ "index": {} }
+{ "nama": "Kelengkeng", "kategori": "Buah Import", "harga": 40000 }
+
+### ============================================
+### 5. Autocomplete Queries
+### ============================================
+
+### Basic Autocomplete - Search for "ap"
+GET {{baseUrl}}/supermarket_buah/_search
+Content-Type: application/json
+
+{
+  "query": {
+    "match": {
+      "nama": {
+        "query": "ap"
+      }
+    }
+  },
+  "size": 5
+}
+
+### Autocomplete with Fuzzy - Search for "ape"
+GET {{baseUrl}}/supermarket_buah/_search
+Content-Type: application/json
+
+{
+  "query": {
+    "match": {
+      "nama": {
+        "query": "ape",
+        "fuzziness": "AUTO",
+        "prefix_length": 2
+      }
+    }
+  },
+  "size": 5
+}
+
+### Autocomplete with Fuzzy + Rank by Harga
+GET {{baseUrl}}/supermarket_buah/_search
+Content-Type: application/json
+
+{
+  "query": {
+    "match": {
+      "nama": {
+        "query": "ape",
+        "fuzziness": "AUTO",
+        "prefix_length": 2
+      }
+    }
+  },
+  "sort": [
+    { "harga": { "order": "desc" } }
+  ],
+  "size": 5
+}
+
+### Autocomplete with Fuzzy - Search for "aple" (typo)
+GET {{baseUrl}}/supermarket_buah/_search
+Content-Type: application/json
+
+{
+  "query": {
+    "match": {
+      "nama": {
+        "query": "aple",
+        "fuzziness": "AUTO",
+        "prefix_length": 2
+      }
+    }
+  },
+  "size": 5
+}
+
+### ============================================
+### 6. Remove Index
+### ============================================
+DELETE {{baseUrl}}/supermarket_buah
+Content-Type: application/json
